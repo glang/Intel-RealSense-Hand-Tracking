@@ -12,6 +12,22 @@
 
 std::vector<texture_buffer> buffers;
 
+void toggleStreams(std::vector<rs::device *>& devices) {
+	rs::device* dev1 = devices.at(0);
+	rs::device* dev2 = devices.at(1);
+
+	if (dev1->is_streaming() && dev2->is_streaming())
+		dev2->stop();
+	else if (dev1->is_streaming()) {
+		dev1->stop();
+		dev2->start();
+	}
+	else{
+		dev2->stop();
+		dev1->start();
+	}
+}
+
 int main(int argc, char * argv[]) try
 {
 	rs::log_to_console(rs::log_severity::warn);
@@ -29,7 +45,6 @@ int main(int argc, char * argv[]) try
 
 	auto colorStream = rs::stream::color;
 	auto depthStream = rs::stream::depth;
-	auto irstream = rs::stream::infrared;
 
 	// Configure and start our devices
 	for (auto dev : devices)
@@ -48,30 +63,31 @@ int main(int argc, char * argv[]) try
 	char * d1_depth_window = "Device 1 Depth Stream";
 	char * d2_color_window = "Device 2 Color Stream";
 	char * d2_depth_window = "Device 2 Depth Stream";
-	cv::namedWindow(d1_color_window, cv::WINDOW_AUTOSIZE);
+	//cv::namedWindow(d1_color_window, cv::WINDOW_AUTOSIZE);
 	cv::namedWindow(d1_depth_window, cv::WINDOW_AUTOSIZE);
-	cv::namedWindow(d2_color_window, cv::WINDOW_AUTOSIZE);
+	//cv::namedWindow(d2_color_window, cv::WINDOW_AUTOSIZE);
 	cv::namedWindow(d2_depth_window, cv::WINDOW_AUTOSIZE);
 
 	int key;
 
 	while (1)
 	{
+		toggleStreams(devices);
+		
 		for (auto dev : devices)
 		{
-			dev->poll_for_frames();
-			const auto c = dev->get_stream_intrinsics(colorStream), d = dev->get_stream_intrinsics(rs::stream::depth);
+			dev->wait_for_frames();
+			const auto c = dev->get_stream_intrinsics(colorStream), d = dev->get_stream_intrinsics(depthStream);
 
-			cv::Mat colorMat(dev->get_stream_height(colorStream), dev->get_stream_width(colorStream), CV_8UC3, (void *)dev->get_frame_data(colorStream));
+			//cv::Mat colorMat(dev->get_stream_height(colorStream), dev->get_stream_width(colorStream), CV_8UC3, (void *)dev->get_frame_data(colorStream));
 			cv::Mat depthMat(dev->get_stream_height(depthStream), dev->get_stream_width(depthStream), CV_16UC1, (void *)dev->get_frame_data(depthStream));
-			//cv::Mat depthMat(dev->get_stream_height(irstream), dev->get_stream_width(irstream), CV_16UC2, (void *)dev->get_frame_data(irstream));
 
 			if (dev == devices.at(0)) {
-				cv::imshow(d1_color_window, colorMat);
+				//cv::imshow(d1_color_window, colorMat);
 				cv::imshow(d1_depth_window, depthMat);
 			}
 			else {
-				cv::imshow(d2_color_window, colorMat);
+				//cv::imshow(d2_color_window, colorMat);
 				cv::imshow(d2_depth_window, depthMat);
 			}
 
