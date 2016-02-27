@@ -11,20 +11,26 @@
 #include <algorithm>
 
 std::vector<texture_buffer> buffers;
+auto colorStream = rs::stream::color;
+auto depthStream = rs::stream::depth;
 
-void toggleStreams(std::vector<rs::device *>& devices) {
+rs::device* toggleStreams(std::vector<rs::device *>& devices) {
 	rs::device* dev1 = devices.at(0);
 	rs::device* dev2 = devices.at(1);
 
-	if (dev1->is_streaming() && dev2->is_streaming())
-		dev2->stop();
-	else if (dev1->is_streaming()) {
-		dev1->stop();
-		dev2->start();
+	if (dev1->get_option(rs::option::f200_laser_power) == dev2->get_option(rs::option::f200_laser_power)) {
+		dev2->set_option(rs::option::f200_laser_power, 0);
+		return dev1;
+	}
+	else if (dev1->get_option(rs::option::f200_laser_power) == 12) {
+		dev1->set_option(rs::option::f200_laser_power, 0);
+		dev2->set_option(rs::option::f200_laser_power, 12);
+		return dev2;
 	}
 	else{
-		dev2->stop();
-		dev1->start();
+		dev2->set_option(rs::option::f200_laser_power, 0);
+		dev1->set_option(rs::option::f200_laser_power, 12);
+		return dev1;
 	}
 }
 
@@ -42,9 +48,6 @@ int main(int argc, char * argv[]) try
 	{
 		devices.push_back(ctx.get_device(i));
 	}
-
-	auto colorStream = rs::stream::color;
-	auto depthStream = rs::stream::depth;
 
 	// Configure and start our devices
 	for (auto dev : devices)
@@ -72,29 +75,25 @@ int main(int argc, char * argv[]) try
 
 	while (1)
 	{
-		toggleStreams(devices);
-		
-		for (auto dev : devices)
-		{
-			dev->wait_for_frames();
-			const auto c = dev->get_stream_intrinsics(colorStream), d = dev->get_stream_intrinsics(depthStream);
+		auto dev = toggleStreams(devices);
+		dev->wait_for_frames();
+		const auto c = dev->get_stream_intrinsics(colorStream), d = dev->get_stream_intrinsics(depthStream);
 
-			//cv::Mat colorMat(dev->get_stream_height(colorStream), dev->get_stream_width(colorStream), CV_8UC3, (void *)dev->get_frame_data(colorStream));
-			cv::Mat depthMat(dev->get_stream_height(depthStream), dev->get_stream_width(depthStream), CV_16UC1, (void *)dev->get_frame_data(depthStream));
+		//cv::Mat colorMat(dev->get_stream_height(colorStream), dev->get_stream_width(colorStream), CV_8UC3, (void *)dev->get_frame_data(colorStream));
+		cv::Mat depthMat(dev->get_stream_height(depthStream), dev->get_stream_width(depthStream), CV_16UC1, (void *)dev->get_frame_data(depthStream));
 
-			if (dev == devices.at(0)) {
-				//cv::imshow(d1_color_window, colorMat);
-				cv::imshow(d1_depth_window, depthMat);
-			}
-			else {
-				//cv::imshow(d2_color_window, colorMat);
-				cv::imshow(d2_depth_window, depthMat);
-			}
+		if (dev == devices.at(0)) {
+			//cv::imshow(d1_color_window, colorMat);
+			cv::imshow(d1_depth_window, depthMat);
+		}
+		else {
+			//cv::imshow(d2_color_window, colorMat);
+			cv::imshow(d2_depth_window, depthMat);
+		}
 
-			key = cv::waitKey(10);
-			if (key == 27) {
-				break;
-			}
+		key = cv::waitKey(10);
+		if (key == 27) {
+			break;
 		}
 	}
 
