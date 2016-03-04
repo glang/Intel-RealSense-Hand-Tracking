@@ -18,18 +18,14 @@ rs::device* toggleStreams(std::vector<rs::device *>& devices) {
 	rs::device* dev1 = devices.at(0);
 	rs::device* dev2 = devices.at(1);
 
-	if (dev1->get_option(rs::option::f200_laser_power) == dev2->get_option(rs::option::f200_laser_power)) {
-		dev2->set_option(rs::option::f200_laser_power, 0);
-		return dev1;
-	}
-	else if (dev1->get_option(rs::option::f200_laser_power) == 12) {
+	if (dev1->get_option(rs::option::f200_laser_power) > 0) {
 		dev1->set_option(rs::option::f200_laser_power, 0);
-		dev2->set_option(rs::option::f200_laser_power, 12);
+		dev2->set_option(rs::option::f200_laser_power, 15);
 		return dev2;
 	}
 	else{
 		dev2->set_option(rs::option::f200_laser_power, 0);
-		dev1->set_option(rs::option::f200_laser_power, 12);
+		dev1->set_option(rs::option::f200_laser_power, 15);
 		return dev1;
 	}
 }
@@ -53,10 +49,10 @@ int main(int argc, char * argv[]) try
 	for (auto dev : devices)
 	{
 		std::cout << "Starting " << dev->get_name() << "... ";
-//		dev->enable_stream(depthStream, rs::preset::best_quality);
+		dev->enable_stream(depthStream, rs::preset::best_quality);
 
-		//limit the frame rate to see if laser speed catches up. Will have to try a variety of framerates for testing
-		dev->enable_stream(rs::stream::depth, 640, 480, rs::format::z16, 30);
+//		limit the frame rate to see if laser speed catches up. Will have to try a variety of framerates for testing
+//		dev->enable_stream(rs::stream::depth, 640, 480, rs::format::z16, 20);
 		dev->enable_stream(colorStream, rs::preset::best_quality);
 		dev->start();
 		std::cout << "done." << std::endl;
@@ -79,7 +75,7 @@ int main(int argc, char * argv[]) try
 	while (1)
 	{
 		auto dev = toggleStreams(devices);
-		dev->wait_for_frames();
+		dev->poll_for_frames();
 		const auto c = dev->get_stream_intrinsics(colorStream), d = dev->get_stream_intrinsics(depthStream);
 
 		//cv::Mat colorMat(dev->get_stream_height(colorStream), dev->get_stream_width(colorStream), CV_8UC3, (void *)dev->get_frame_data(colorStream));
