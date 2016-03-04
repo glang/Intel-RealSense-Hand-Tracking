@@ -53,7 +53,10 @@ int main(int argc, char * argv[]) try
 	for (auto dev : devices)
 	{
 		std::cout << "Starting " << dev->get_name() << "... ";
-		dev->enable_stream(depthStream, rs::preset::best_quality);
+//		dev->enable_stream(depthStream, rs::preset::best_quality);
+
+		//limit the frame rate to see if laser speed catches up. Will have to try a variety of framerates for testing
+		dev->enable_stream(rs::stream::depth, 640, 480, rs::format::z16, 30);
 		dev->enable_stream(colorStream, rs::preset::best_quality);
 		dev->start();
 		std::cout << "done." << std::endl;
