@@ -3,32 +3,11 @@
 
 #include <librealsense/rs.hpp>
 #include "example.hpp"
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-
 
 #include <iostream>
 #include <algorithm>
 
 std::vector<texture_buffer> buffers;
-auto colorStream = rs::stream::color;
-auto depthStream = rs::stream::depth;
-
-rs::device* toggleStreams(std::vector<rs::device *>& devices) {
-	rs::device* dev1 = devices.at(0);
-	rs::device* dev2 = devices.at(1);
-
-	if (dev1->get_option(rs::option::f200_laser_power) > 0) {
-		dev1->set_option(rs::option::f200_laser_power, 0);
-		dev2->set_option(rs::option::f200_laser_power, 15);
-		return dev2;
-	}
-	else{
-		dev2->set_option(rs::option::f200_laser_power, 0);
-		dev1->set_option(rs::option::f200_laser_power, 15);
-		return dev1;
-	}
-}
 
 int main(int argc, char * argv[]) try
 {
@@ -49,53 +28,62 @@ int main(int argc, char * argv[]) try
 	for (auto dev : devices)
 	{
 		std::cout << "Starting " << dev->get_name() << "... ";
-		dev->enable_stream(depthStream, rs::preset::best_quality);
 
-//		limit the frame rate to see if laser speed catches up. Will have to try a variety of framerates for testing
-//		dev->enable_stream(rs::stream::depth, 640, 480, rs::format::z16, 20);
-		dev->enable_stream(colorStream, rs::preset::best_quality);
+		dev->enable_stream(rs::stream::depth, rs::preset::best_quality);
+//		dev->enable_stream(rs::stream::color, rs::preset::best_quality);
 		dev->start();
 		std::cout << "done." << std::endl;
 	}
 
 	// Depth and color
-	buffers.resize(ctx.get_device_count() * 2);
+	//buffers.resize(ctx.get_device_count() * 2);
+	buffers.resize(ctx.get_device_count());
 
-	char * d1_color_window = "Device 1 Color Stream";
-	char * d1_depth_window = "Device 1 Depth Stream";
-	char * d2_color_window = "Device 2 Color Stream";
-	char * d2_depth_window = "Device 2 Depth Stream";
-	//cv::namedWindow(d1_color_window, cv::WINDOW_AUTOSIZE);
-	cv::namedWindow(d1_depth_window, cv::WINDOW_AUTOSIZE);
-	//cv::namedWindow(d2_color_window, cv::WINDOW_AUTOSIZE);
-	cv::namedWindow(d2_depth_window, cv::WINDOW_AUTOSIZE);
+	// Open a GLFW window
+	glfwInit();
+	std::ostringstream ss; ss << "CPP Multi-Camera Example";
+	GLFWwindow * win = glfwCreateWindow(1280, 480, ss.str().c_str(), 0, 0);
+	glfwMakeContextCurrent(win);
 
-	int key;
+	int windowWidth, windowHeight;
+	glfwGetWindowSize(win, &windowWidth, &windowHeight);
 
-	while (1)
+	// Does not account for correct aspect ratios
+	auto perTextureWidth = windowWidth / devices.size();
+	auto perTextureHeight = 480;
+
+	while (!glfwWindowShouldClose(win))
 	{
-		auto dev = toggleStreams(devices);
-		dev->poll_for_frames();
-		const auto c = dev->get_stream_intrinsics(colorStream), d = dev->get_stream_intrinsics(depthStream);
+		// Wait for new images
+		glfwPollEvents();
 
-		//cv::Mat colorMat(dev->get_stream_height(colorStream), dev->get_stream_width(colorStream), CV_8UC3, (void *)dev->get_frame_data(colorStream));
-		cv::Mat depthMat(dev->get_stream_height(depthStream), dev->get_stream_width(depthStream), CV_16UC1, (void *)dev->get_frame_data(depthStream));
+		// Draw the images
+		int w, h;
+		glfwGetFramebufferSize(win, &w, &h);
+		glViewport(0, 0, w, h);
+		glClear(GL_COLOR_BUFFER_BIT);
 
-		if (dev == devices.at(0)) {
-			//cv::imshow(d1_color_window, colorMat);
-			cv::imshow(d1_depth_window, depthMat);
-		}
-		else {
-			//cv::imshow(d2_color_window, colorMat);
-			cv::imshow(d2_depth_window, depthMat);
+		glfwGetWindowSize(win, &w, &h);
+		glPushMatrix();
+		glOrtho(0, w, h, 0, -1, +1);
+		glPixelZoom(1, -1);
+		int i = 0, x = 0;
+		for (auto dev : devices)
+		{
+			dev->poll_for_frames();
+			//const auto c = dev->get_stream_intrinsics(rs::stream::color), d = dev->get_stream_intrinsics(rs::stream::depth);
+			//buffers[i++].show(*dev, rs::stream::color, x, 0, perTextureWidth, perTextureHeight);
+			//buffers[i++].show(*dev, rs::stream::depth, x, perTextureHeight, perTextureWidth, perTextureHeight);
+			buffers[i++].show(*dev, rs::stream::depth, x, 0, perTextureWidth, perTextureHeight);
+			x += perTextureWidth;
 		}
 
-		key = cv::waitKey(10);
-		if (key == 27) {
-			break;
-		}
+		glPopMatrix();
+		glfwSwapBuffers(win);
 	}
 
+	glfwDestroyWindow(win);
+	glfwTerminate();
 	return EXIT_SUCCESS;
 }
 catch (const rs::error & e)
